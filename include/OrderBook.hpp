@@ -33,11 +33,21 @@ class OrderBook{
     }
 
     PriceLevel* find_or_create_level(Price price){
+       auto it = std::lower_bound(levels_.begin() , levels_.end() , price , 
+                                 [](const LevelEntry& e , Price p){return e.price < p;});
+       if(it != levels_.end() && it->price == price) {return &it->list;}
+       LevelEntry new_entry{price , PriceLevel{}};
+       auto pos = levels_.insert(it , new_entry);
 
+       return &pos->list;
     }
 
-    void remove_empty_level(){
-        
+    void remove_empty_level(Price price){
+        auto it = std::lower_bound(levels_.begin() , levels_.end() , price , 
+                              [](const LevelEntry& e , Price p){return e.price < p;});
+        if(it != levels_.end() && it->price == price && it->list.empty()){
+            levels_.erase(it);
+        }
     }
 
     public:
@@ -85,4 +95,41 @@ class OrderBook{
         }
         return 0;
        }
+
+       void match(Order* incoming){
+        (void) incoming;
+       }
+
+       std::optional<Price> best_bid() const{
+        for(auto it = levels_.rbegin();it != levels_.rend();it++){
+            if(!it->list.empty() && it->list.front()->side == Side::Buy){
+                return it->price;
+            }
+        }
+        return std::nullopt;
+       }
+
+       std::optional<Price> best_ask() const{
+         for(const auto& entry : levels_){
+            if(!entry.list.empty() && entry.list.front()->side == Side::Sell){
+                return entry.price;
+            }
+         }
+          return std::nullopt;
+       }
+
+       void dump() const{
+        for(const auto& entry : levels_){
+            if(entry.list.empty()) continue;
+            std::cout<<"Price : "<<entry.price<<" : ";
+            Order* cur = entry.list.front();
+            while(cur){
+                std::cout<<"["<<(cur->side == Side::Buy ? "B" : "S")<<" id = "<<cur->id<<" q = "<<cur->quantity<<"]\n";
+                cur = cur->next;
+            }
+            std::cout<<"\n";
+        }
+       }
+
+       std::size_t used_orders() const {return pool_.used_count();}
 };
