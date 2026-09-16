@@ -25,4 +25,12 @@ struct Order{
     }
 };
 
+struct OrderRequest{
+    OrderId id;
+    Price price;
+    Quantity quantity;
+    Side side;
+    std::uint64_t timestamp;
+};
+
 static_assert(offsetof(Order , prev) % alignof(Order*) == 0);
