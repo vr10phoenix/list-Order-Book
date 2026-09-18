@@ -2,7 +2,7 @@
 #include <cstdint>
 #include<string_view>
 
-using OrderId = std::uint64_t
+using OrderId = std::uint64_t;
 
 enum class EngineErrorCode : std::uint8_t{
     Ok = 0,
