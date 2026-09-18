@@ -5,6 +5,8 @@
 #include<iostream>
 #include "memory.hpp"
 #include "price_level.hpp"
+#include "config.hpp"
+#include "error_codes.hpp"
 
 struct LevelEntry{
     Price price;
@@ -51,27 +53,35 @@ class OrderBook{
     }
 
     public:
-       OrderBook(std::size_t max_orders , std::size_t max_price_levels) : pool_(max_orders){
-        levels_.reserve(max_price_levels);
+       OrderBook(const EngineConfig& cfg) : pool_(cfg.max_orders) , levels_(cfg.max_price_levels){
+        levels_.reserve(cfg.max_price_levels);
        }
 
-       bool add_order(OrderId id , Side side , Price price , Quantity qty , std::uint64_t ts){
-          Order* ord = pool_.allocate();
-          if(!ord) return false;
+       AddOrderResult add_order(OrderId id , Side side , Price price , Quantity qty , std::uint64_t ts){
+        // intital checks
+         if(qty <= 0 ||qty > 1000000) return {false , EngineErrorCode::InvalidQuantity , 0};
+         if(price < 0) return {false , EngineErrorCode::InvalidPrice , 0};
 
-          ord->id = id;
-          ord->price = price;
-          ord->quantity = qty;
-          ord->side = side;
-          ord->timestamp = ts;
+         // pool allocation
+         Order* ord = pool_.allocate();
+         if(!ord) {return {false , EngineErrorCode::PoolExhausted , 0};}
 
-          PriceLevel* level = find_or_create_level(price);
-          if(!level){
+         // fill the order
+         ord->id = id;
+         ord->price = price;
+         ord->side = side;
+         ord->quantity = qty;
+         ord->timestamp = ts;
+
+         // find or create price level : 
+         PriceLevel* level = find_or_create_level(price);
+         if(!level){
             pool_.deallocate(ord);
-            return false;
-          }
-          level->push_back(ord);
-          return true;
+            return {false , EngineErrorCode::PriceLevelLimitReached , 0};
+         }
+
+         level->push_back(ord);
+         return {true , EngineErrorCode::Ok};
        }
 
        Quantity cancel_order(OrderId id , Price price){
