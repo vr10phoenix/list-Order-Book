@@ -168,3 +168,5 @@ inline AsyncLogger& logger(){
 #define LOG_WARN(...) ::logger().log(LogLevel::Warn, __VA_ARGS__)
 #define LOG_FATAL(...) ::logger().log(LogLevel::Fatal, __VA_ARGS__)
 
+
+
