@@ -53,12 +53,23 @@ int main(){
     // consumer thread
     auto consumer = [&](){
         std::uint64_t local_processed = 0;
+        std::uint64_t empty_spins = 0;
+
         while(g_running.load(std::memory_order_acquire) || !queue.empty()){
             auto maybe_req = queue.pop();
             if(!maybe_req){
-                std::this_thread::yield();
+                if(++empty_spins < 1000){
+#if defined(_MSC_VER)
+            _mm_pause();
+#else 
+            __builtin_ia_pause();
+#endif
+                }else{
+                  std::this_thread::sleep_for(std::chrono::microseconds(100));
+                }
                 continue;
             }
+            empty_spins = 0;
             const auto& req = *maybe_req;
             
             // measure only book mutation
@@ -91,6 +102,8 @@ int main(){
     // Producer Thread
     auto producer = [&queue , &config](){
        OrderId id_counter = 0;
+       std::uint32_t full_spins = 0;
+
        while(g_running.load(std::memory_order_acquire)){
         OrderRequest req;
         req.id = id_counter++;
@@ -102,8 +115,17 @@ int main(){
         //push with backpressure
         while(!queue.push(req)){
             if(!g_running.load(std::memory_order_acquire)) break;
-            std::this_thread::yield();
+            if(++full_spins < 1000){
+#if defined(_MSC_VER)
+              _mm_pause();
+#else        
+            __builtin_ia32_pause();
+#endif
+            }else{
+                std::this_thread::sleep_for(std::chrono::microseconds(50));
+            }
         }
+        full_spins = 0;
         if(id_counter >= config.max_orders * 2) break;
        }
     //    std::cout<<" PRODUCER : finished Generating Orders.\n";
@@ -135,6 +157,7 @@ int main(){
     LOG_INFO("PROCESSED ORDERS : " , counter_processed.value() , 
               "REJECTED ORDERS : " , counter_rejected.value());
 
+    logger().flush();
     std::cout<<"\n ========== METRICS SNAPSHOT ==========\n";
     metrics().render_(std::cout);
     logger().flush();
