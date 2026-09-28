@@ -13,8 +13,7 @@ class Memory{
 
   public : 
     explicit Memory(std::size_t capacity) : capacity_(capacity) , free_head_(nullptr){
-        storage_ = static_cast<Order*>(_aligned_malloc(capacity * sizeof(Order), alignof(Order)));
-        if(!storage_) throw std::bad_alloc();
+        storage_ = static_cast<Order*>(::operator new(capacity * sizeof(Order), std::align_val_t{alignof(Order)}));
 
         for(std::size_t i = 0;i<capacity_;i++){
            Order*cur = &storage_[i];
@@ -24,7 +23,7 @@ class Memory{
         free_head_ = &storage_[0];
     }
 
-    ~Memory(){_aligned_free(storage_);}
+   ~Memory(){::operator delete(storage_, std::align_val_t{alignof(Order)});}
 
     Memory(const Memory&) = delete;
     Memory& operator = (const Memory&) = delete; 
