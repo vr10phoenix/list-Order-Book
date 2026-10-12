@@ -142,4 +142,11 @@ class OrderBook{
        }
 
        std::size_t used_orders() const {return pool_.used_count();}
+
+       template <typename Fn>
+       void for_each_level(Fn&& fn) const{
+        for(cont auto& entry : levels_){
+            fn(entry.price , entry.list)
+        }
+       }
 };
