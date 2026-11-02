@@ -145,8 +145,9 @@ class OrderBook{
 
        template <typename Fn>
        void for_each_level(Fn&& fn) const{
-        for(cont auto& entry : levels_){
-            fn(entry.price , entry.list)
+        for(const auto& entry : levels_){
+            if(entry.list.empty()) continue;
+            fn(entry.price , entry.list);
         }
        }
 };
