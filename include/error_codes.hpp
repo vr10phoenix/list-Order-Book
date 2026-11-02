@@ -13,16 +13,36 @@ enum class EngineErrorCode : std::uint8_t{
     OrderNotFound          // for cancellations
 };
 
+// inline std::string_view to_string(EngineErrorCode code){
+//     using enum EngineErrorCode ;
+//     switch (code){
+//         case Ok: return "Success";
+//         case PoolExhausted: return "OrderPoolExhausted";
+//         case PriceLevelLimitReached: return "PriceLevelLimitReached";
+//         case InvalidQuantity: return "InvalidQuantity";
+//         case InvalidPrice: return "InvalidPrice";
+//         case OrderNotFound: return "OrderNotFound";
+//         default: return "UnknownError";
+//     }
+// }
+
 inline std::string_view to_string(EngineErrorCode code){
-    using enum EngineErrorCode ;
-    switch (code){
-        case Ok: return "Success";
-        case PoolExhausted: return "OrderPoolExhausted";
-        case PriceLevelLimitReached: return "PriceLevelLimitReached";
-        case InvalidQuantity: return "InvalidQuantity";
-        case InvalidPrice: return "InvalidPrice";
-        case OrderNotFound: return "OrderNotFound";
-        default: return "UnknownError";
+    switch (code)
+    {
+        case EngineErrorCode::Ok:
+            return "Success";
+        case EngineErrorCode::PoolExhausted:
+            return "OrderPoolExhausted";
+        case EngineErrorCode::PriceLevelLimitReached:
+            return "PriceLevelLimitReached";
+        case EngineErrorCode::InvalidQuantity:
+            return "InvalidQuantity";
+        case EngineErrorCode::InvalidPrice:
+            return "InvalidPrice";
+        case EngineErrorCode::OrderNotFound:
+            return "OrderNotFound";
+        default:
+            return "UnknownError";
     }
 }
 
