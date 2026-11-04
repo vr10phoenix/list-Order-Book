@@ -13,4 +13,4 @@ struct EngineConfig{
     // Operational limit
     std::uint64_t max_order_qty = 1000000; // 1 million
     std::uint64_t max_order_price = 100000000; // 100 million
-}
+};
