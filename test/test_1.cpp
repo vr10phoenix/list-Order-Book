@@ -36,8 +36,9 @@ int main() {
     cfg.max_orders          = kMaxOrders;
     cfg.max_price_levels    = kMaxLevels;
     cfg.spsc_queue_capacity = 1u << 16;
-
-    OrderBook book(cfg);
+    
+    SPSCQueue<Trade> outbound(cfg.outbound_queue_capacity);
+    OrderBook book(cfg , outbound);
     SplitMix64 rng(kSeed);
     DecisionTally tally;
 

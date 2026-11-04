@@ -38,8 +38,9 @@ int main(){
     config.spsc_queue_capacity = 1 << 16;
 
     // Instatntize Book and Queue
-    OrderBook book(config);
     SPSCQueue<OrderRequest>queue(config.spsc_queue_capacity);
+    SPSCQueue<Trade> outbound(config.outbound_queue_capacity);
+    OrderBook book(config , outbound);
     
     // mertics
     std::atomic<std::uint64_t> total_processed{0};
@@ -138,7 +139,7 @@ int main(){
 
     // Wait for producer to finish
     t_producer.join();
-    g_running.store(true , std::memory_order_release);
+    g_running.store(false , std::memory_order_release);
 
     // wait for consumer to drain rem. queues
     t_consumer.join();

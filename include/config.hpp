@@ -9,8 +9,10 @@ struct EngineConfig{
 
     //pipeline capacity:
     std::size_t spsc_queue_capacity = 1 << 16;
+    std::size_t outbound_queue_capacity = 1 << 20;
 
     // Operational limit
     std::uint64_t max_order_qty = 1000000; // 1 million
     std::uint64_t max_order_price = 100000000; // 100 million
+    Price tick_size = 1; // must be multiple of tick 
 };

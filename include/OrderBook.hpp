@@ -3,10 +3,12 @@
 #include<algorithm>
 #include<optional>
 #include<iostream>
+#include<cstddef>
 #include "memory.hpp"
 #include "price_level.hpp"
 #include "config.hpp"
 #include "error_codes.hpp"
+#include "spsc_queue.hpp"
 
 struct LevelEntry{
     Price price;
@@ -17,6 +19,14 @@ class OrderBook{
     private : 
     Memory pool_;
     std::vector<LevelEntry>levels_;
+    EngineConfig cfg_;
+    SPSCQueue<Trade>&outbound_;
+    std::uint64_t match_seq_{0};
+
+    Quantity match_incoming(OrderId id , Side side , Price price , Quantity qty , std::uint64_t ts){
+        (void)id;(void) side , (void)price , (void)ts;
+        return qty;
+    }
 
     PriceLevel* find_level(Price price){
         auto it = std::lower_bound(levels_.begin() , levels_.end() , price , 
@@ -53,18 +63,25 @@ class OrderBook{
     }
 
     public:
-       OrderBook(const EngineConfig& cfg) : pool_(cfg.max_orders) , levels_(cfg.max_price_levels){
+       OrderBook(const EngineConfig& cfg , SPSCQueue<Trade>& outbound) : cfg_(cfg) , pool_(cfg.max_orders) , levels_(cfg.max_price_levels) , outbound_(outbound){
         levels_.reserve(cfg.max_price_levels);
        }
 
        AddOrderResult add_order(OrderId id , Side side , Price price , Quantity qty , std::uint64_t ts){
         // intital checks
-         if(qty <= 0 ||qty > 1000000) return {false , EngineErrorCode::InvalidQuantity , 0};
-         if(price < 0) return {false , EngineErrorCode::InvalidPrice , 0};
+         if(qty <= 0 || static_cast<std::uint64_t>(qty) > cfg_.max_order_qty) return {false , EngineErrorCode::InvalidQuantity , 0};
+         if(price <= 0 || static_cast<std::uint64_t>(price) > cfg_.max_order_price) return {false , EngineErrorCode::InvalidPrice , 0};
+         if(price % cfg_.tick_size != 0) return {false , EngineErrorCode::InvalidPrice , 0};
 
          // pool allocation
          Order* ord = pool_.allocate();
          if(!ord) {return {false , EngineErrorCode::PoolExhausted , 0};}
+
+         Quantity remaining = match_incoming(id , side , price , qty , ts);
+         if(remaining == 0){
+            pool_.deallocate(ord);
+            return {true , EngineErrorCode::Ok , id};
+        }
 
          // fill the order
          ord->id = id;
