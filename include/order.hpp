@@ -34,3 +34,13 @@ struct OrderRequest{
 };
 
 static_assert(offsetof(Order , prev) % alignof(Order*) == 0);
+
+struct Trade{
+  OrderId taker_id;
+  OrderId maker_id;
+  Price price;
+  Quantity quantity;
+  Side taker_side;
+  std::uint64_t timestamp;
+  std::uint64_t match_seq;
+};
