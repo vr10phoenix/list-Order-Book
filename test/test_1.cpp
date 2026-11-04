@@ -20,7 +20,7 @@ constexpr Quantity      kQtyMin     = 1;
 constexpr Quantity      kQtySpan    = 500;
 
 // Regenerate ONLY via the workflow above.
-constexpr std::uint64_t kGoldenHash = 0ULL;
+constexpr std::uint64_t kGoldenHash = 0x516943EC6C026CF7ULL;
 
 struct DecisionTally {
     std::uint64_t accepted          = 0;
