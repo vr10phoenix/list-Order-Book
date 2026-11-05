@@ -4,6 +4,7 @@
 #include<optional>
 #include<iostream>
 #include<cstddef>
+#include<cassert>
 #include "memory.hpp"
 #include "price_level.hpp"
 #include "config.hpp"
@@ -23,9 +24,75 @@ class OrderBook{
     SPSCQueue<Trade>&outbound_;
     std::uint64_t match_seq_{0};
 
-    Quantity match_incoming(OrderId id , Side side , Price price , Quantity qty , std::uint64_t ts){
-        (void)id;(void) side , (void)price , (void)ts;
-        return qty;
+
+    void match_buy(Order* taker){
+        while(taker->quantity > 0){
+          PriceLevel* level = find_matchable_sell(taker->price);
+          if(!level) break;
+          if(match_against_level(taker , level))break;   
+        }
+    }
+
+    void match_sell(Order* taker){
+        while(taker->quantity > 0){
+            PriceLevel* level = find_matchable_buy(taker->price);
+            if(!level) break;
+            if(!match_against_level(taker , level)) break;
+        }
+    }
+    
+    // level with price <= limit --> sold first
+    PriceLevel* find_matchable_sell(Price lim){
+        for(auto& e : levels_){
+            if(e.list.empty()) continue;
+            if(e.list.front()->side != Side::Sell) continue;
+            if(e.price > lim) return nullptr;
+            return &e.list;
+        }
+        return nullptr;
+    }
+
+    // hightest buy with price >= limit
+    PriceLevel* find_matchable_buy(Price lim){
+        for(auto it = levels_.rbegin();it != levels_.rend();++it){
+            if(it->list.empty()) continue;
+            if(it->list.front()->side != Side::Buy) continue;
+            if(it->price < lim) return nullptr;
+
+            return &it->list;
+        }
+        return nullptr;
+    }
+
+    // Match taker
+    bool match_against_level(Order* taker , PriceLevel* level){
+        assert(!level->empty());
+        Order* maker = level->front();
+        Quantity match_qty = std::min(taker->quantity , maker->quantity);
+
+        Trade tr{
+            taker->id,
+            maker->id,
+            maker->price,
+            match_qty,
+            taker->side,
+            taker->timestamp,
+            match_seq_ + 1
+        };
+
+        if(!outbound_.push(tr)) return false;
+        ++match_seq_;
+
+        taker->quantity -= match_qty;
+        maker->quantity -= match_qty;
+
+        if(maker->quantity == 0){
+            const Price maker_price = maker->price;
+            level->pop_front();
+            pool_.deallocate(maker);
+            if(level->empty()) remove_empty_level(maker_price);
+        }
+        return true;
     }
 
     PriceLevel* find_level(Price price){
@@ -48,6 +115,7 @@ class OrderBook{
        auto it = std::lower_bound(levels_.begin() , levels_.end() , price , 
                                  [](const LevelEntry& e , Price p){return e.price < p;});
        if(it != levels_.end() && it->price == price) {return &it->list;}
+       if(levels_.size() >= levels_.capacity()) return nullptr;
        LevelEntry new_entry{price , PriceLevel{}};
        auto pos = levels_.insert(it , new_entry);
 
@@ -63,7 +131,7 @@ class OrderBook{
     }
 
     public:
-       OrderBook(const EngineConfig& cfg , SPSCQueue<Trade>& outbound) : cfg_(cfg) , pool_(cfg.max_orders) , levels_(cfg.max_price_levels) , outbound_(outbound){
+       OrderBook(const EngineConfig& cfg , SPSCQueue<Trade>& outbound) : cfg_(cfg) , pool_(cfg.max_orders) , levels_(), outbound_(outbound){
         levels_.reserve(cfg.max_price_levels);
        }
 
@@ -77,18 +145,22 @@ class OrderBook{
          Order* ord = pool_.allocate();
          if(!ord) {return {false , EngineErrorCode::PoolExhausted , 0};}
 
-         Quantity remaining = match_incoming(id , side , price , qty , ts);
-         if(remaining == 0){
-            pool_.deallocate(ord);
-            return {true , EngineErrorCode::Ok , id};
-        }
-
          // fill the order
          ord->id = id;
          ord->price = price;
          ord->side = side;
          ord->quantity = qty;
          ord->timestamp = ts;
+         ord->prev = nullptr;
+         ord->next = nullptr;
+
+         if(side == Side::Buy) match_buy(ord);
+         else match_sell(ord);
+
+         if(ord->quantity == 0){
+            pool_.deallocate(ord);
+            return {true , EngineErrorCode::Ok , id};
+         }
 
          // find or create price level : 
          PriceLevel* level = find_or_create_level(price);
@@ -98,7 +170,7 @@ class OrderBook{
          }
 
          level->push_back(ord);
-         return {true , EngineErrorCode::Ok};
+         return {true , EngineErrorCode::Ok , id};
        }
 
        Quantity cancel_order(OrderId id , Price price){
@@ -121,10 +193,6 @@ class OrderBook{
             cur = next;
         }
         return 0;
-       }
-
-       void match(Order* incoming){
-        (void) incoming;
        }
 
        std::optional<Price> best_bid() const{
