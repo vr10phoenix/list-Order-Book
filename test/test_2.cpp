@@ -1,6 +1,7 @@
 #include<cstdio>
 #include<cstdint>
 #include<vector>
+#include "order.hpp"
 #include "config.hpp"
 #include "OrderBook.hpp"
 #include "spsc_queue.hpp"
@@ -54,14 +55,14 @@ namespace{
 
     void expect_book_empty(){
         if(book.used_orders() != 0){
-            std::printf("[%s] FAIL : expected %zu resting , got %zu\n" , name , book.used_orders());
+            std::printf("[%s] FAIL : expected %zu resting , got %zu\n" , name , 0 , book.used_orders());
             ++failures;
         }
     }
 
     void expect_resting(std::size_t n){
         if(book.used_orders() != n){
-            std::printf("[%s] FAIL : expected %zu resting , got %zu \n" , name , book.used_orders());
+            std::printf("[%s] FAIL : expected %zu resting , got %zu \n" , name ,n , book.used_orders());
             ++failures;
         }
     }
@@ -70,7 +71,7 @@ namespace{
         const auto bb = book.best_bid();
         const auto ba = book.best_ask();
         if(bb && ba && *bb >= *ba){
-            std::printf("[%s] FAIL : book crossed bid = %llu ask = %llu \n" , static_cast<long long>(*bb) , static_cast<long long>(*ba));
+            std::printf("[%s] FAIL : book crossed bid = %llu ask = %llu \n" ,name ,  static_cast<long long>(*bb) , static_cast<long long>(*ba));
             ++failures;
         }
     }
