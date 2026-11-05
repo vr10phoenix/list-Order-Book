@@ -46,6 +46,8 @@ int main(){
     std::atomic<std::uint64_t> total_processed{0};
     std::atomic<std::uint64_t> total_rejected_pool{0};
     std::atomic<std::uint64_t> total_rejected_price{0};
+    std::atomic<std::uint64_t> total_trades{0};
+    std::atomic<std::int64_t> total_trade_volume{0};
 
     LOG_INFO("Engine starting. max_orders=" , config.max_orders, "max_levels=" , config.max_price_levels ,
                "queue_capacity" , config.spsc_queue_capacity);
@@ -81,6 +83,11 @@ int main(){
             const auto ns = static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count());
 
             histogram_add.record(ns);
+
+            while (auto maybe_trade = outbound.pop()) {
+                ++total_trades;
+                total_trade_volume += maybe_trade->quantity;
+            }
 
             if(result.success){counter_processed.inc();}
             else{
@@ -157,6 +164,8 @@ int main(){
     LOG_INFO("RESTING ORDERS : " , book.used_orders());
     LOG_INFO("PROCESSED ORDERS : " , counter_processed.value() , 
               "REJECTED ORDERS : " , counter_rejected.value());
+    LOG_INFO("TRADES EMITTED: " , total_trades.load());
+    LOG_INFO("TRADE VOLUME:" , total_trade_volume.load());
 
     logger().flush();
     std::cout<<"\n ========== METRICS SNAPSHOT ==========\n";
