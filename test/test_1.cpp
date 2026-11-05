@@ -20,7 +20,7 @@ constexpr Quantity      kQtyMin     = 1;
 constexpr Quantity      kQtySpan    = 500;
 
 // Regenerate ONLY via the workflow above.
-constexpr std::uint64_t kGoldenHash = 0x516943EC6C026CF7ULL;
+constexpr std::uint64_t kGoldenHash = 0xA38FD8636F781053ULL;
 
 struct DecisionTally {
     std::uint64_t accepted          = 0;
@@ -45,6 +45,9 @@ int main() {
     // NO threads. NO wall-clock. Single-threaded, in-order, reproducible
     // from the seed alone.
     std::uint64_t ts = 0;
+    std::uint64_t total_trades = 0;
+    std::uint64_t total_volume = 0;
+
     for (std::size_t i = 0; i < kNumOrders; ++i) {
         const OrderId  id    = static_cast<OrderId>(i);
         const Side     side  = (rng.next() & 1u) ? Side::Buy : Side::Sell;
@@ -53,6 +56,11 @@ int main() {
         ts += 1000;
 
         auto r = book.add_order(id, side, price, qty, ts);
+        while(auto maybe_trade = outbound.pop()){
+            ++total_trades;
+            total_volume += maybe_trade->quantity;
+        }
+
         if (r.success) {
             ++tally.accepted;
         } else {
@@ -66,7 +74,17 @@ int main() {
         }
     }
 
+    const auto bb = book.best_bid();
+    const auto ba = book.best_ask();
+    if(bb && ba && *bb >= *ba){
+       std::printf("\n [FAIL] book crssed : bid=%lld ask=%lld\n" , static_cast<long long>(*bb) , static_cast<long long>(*ba));
+       return 1;
+    }
+
+
     const std::uint64_t computed = snapshot::hash(book);
+    std::printf("trades : %llu\n" , static_cast<long long>(total_trades));
+    std::printf("trade volumes : %llu\n" , static_cast<long long>(total_volume));
 
     std::printf("=== Determinism Test ===\n");
     std::printf("seed          : 0x%016llX\n", static_cast<unsigned long long>(kSeed));
