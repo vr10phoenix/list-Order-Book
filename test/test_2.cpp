@@ -122,11 +122,68 @@ void scenario_partial_taker() {
     t.expect_not_crossed();
     t.result();
 }
+
+void scenario_no_cross(){
+    TestContext t("S4:no_cross");
+    t.add(1, Side::Sell, 100, 100, 1000);
+    t.add(2, Side::Buy,   99, 100, 2000);
+    auto trades = t.drain();
+    if (!trades.empty()) {
+        std::printf("[S4] FAIL: expected 0 trades, got %zu\n", trades.size());
+        ++t.failures;
+    }
+    t.expect_resting(2);
+    t.expect_not_crossed();
+    t.result();
+}
+
+void scenario_partial_maker(){
+    TestContext t("S3:partial_maker");
+    t.add(1, Side::Sell, 100, 100, 1000);
+    (void)t.drain();
+    t.add(2, Side::Buy,  100, 150, 2000);
+    auto trades = t.drain();
+    if (trades.size() != 1 || trades[0].quantity != 100) {
+        std::printf("[S3] FAIL: expected 1 trade qty 100\n");
+        ++t.failures;
+    }
+    t.expect_resting(1);
+    t.expect_not_crossed();
+    t.result();
+}
+
+void scenario_fifo(){
+    TestContext t("S5:fifo");
+    t.add(1, Side::Sell, 100, 50, 1000);  
+    t.add(2, Side::Sell, 100, 50, 2000); 
+    (void)t.drain();
+    t.add(3, Side::Buy,  100, 100, 3000);  
+    auto trades = t.drain();
+    if (trades.size() != 2) {
+        std::printf("[S5] FAIL: expected 2 trades, got %zu\n", trades.size());
+        ++t.failures;
+    } else {
+        if (trades[0].maker_id != 1 || trades[0].quantity != 50) {
+            std::printf("[S5] FAIL: first trade must hit maker 1 (id=1), got maker=%llu\n",
+                        static_cast<unsigned long long>(trades[0].maker_id));
+            ++t.failures;
+        }
+        if (trades[1].maker_id != 2 || trades[1].quantity != 50) {
+            std::printf("[S5] FAIL: second trade must hit maker 2 (id=2), got maker=%llu\n",
+                        static_cast<unsigned long long>(trades[1].maker_id));
+            ++t.failures;
+        }
+    }
+    t.expect_book_empty();
+    t.result();
+}
 }
 
 int main(){
     scenario_full_match();
     scenario_partial_taker();
-
+    scenario_fifo();
+    scenario_partial_maker();
+    scenario_no_cross();
     return 0;
 }
